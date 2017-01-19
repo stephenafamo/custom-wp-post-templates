@@ -26,7 +26,7 @@ Options:
 
 == Installation ==
 
-1. Upload `agadyn-affiliates.php` to the `/wp-content/plugins/` directory
+1. Upload `html-php-pages-and-posts` to the `/wp-content/plugins/` directory
 1. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Frequently Asked Questions ==
