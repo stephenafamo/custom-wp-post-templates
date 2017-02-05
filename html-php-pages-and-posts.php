@@ -3,7 +3,7 @@
 Plugin Name: HTML/PHP Pages and Posts
 Plugin URI: http://www.github.com/stephenafamo/html-php-pages-and-posts
 Description: Use uploaded html or php files as templates for pages and posts.
-Version: 1.0.0
+Version: 1.1.0
 Author: Stephen Afam-Osemene
 Author URI: https://www.stephenafamo.com/
 License: GPL-2.0+
@@ -69,11 +69,13 @@ if (!class_exists("CustomPagesAndPosts")) {
         }
 
         public function add_custom_meta_box(){
+            $default_post_types = ["post", "page"];
+            $post_types = apply_filters ( 'hppp_post_types', $default_post_types);
             add_meta_box( 
                 'agadyn_custom_template', 
                 'Custom HTML or PHP', 
                 array($this, 'custom_meta_box_markup'),
-                ["post", "page"],
+                $post_types,
                 'normal',
                 'high');
 

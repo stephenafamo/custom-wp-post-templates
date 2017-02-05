@@ -4,7 +4,7 @@ Donate link: http://stephenafamo.com
 Tags: html, php, custom pages, custom templates, custom posts
 Requires at least: 3.0.1
 Tested up to: 4.7.1
-Stable tag: 4.7.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,21 @@ Options:
 * Above Content: Your custom content is simply added to the top of the page content
 * Below Content: You custom content is placed just beneath the page content.
 
+=Adding support for custom post types =
+use the `hppp_post_types` filter to add more post types.
+
+Like this:
+
+```
+        public function post_type_modify ($post_types) {
+            $post_types[] = 'custom_post_type';
+            return $post_types;
+        }
+
+	    add_filter( 'hppp_post_types', 'post_type_modify' );
+	    ```
+
+
 == Installation ==
 
 1. Upload `html-php-pages-and-posts` to the `/wp-content/plugins/` directory
@@ -41,7 +56,14 @@ e.g. `<link rel='stylesheet' href='http://example.com/wp-content/2017/01/my_cust
 Yes.
 All wordpress functions, and any installed plugin function will work if called properly
 
+= What post types will this work with? =
+
+By default, it can only be used by on pages and posts, but you can add any other post type by hooking into the `hppp_post_types` filter.
+
 == Changelog ==
+
+= 1.1.0 =
+* Add filter hook to modify supported post_types
 
 = 1.0.0 =
 * First release
