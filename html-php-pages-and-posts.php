@@ -1,9 +1,9 @@
 <?php
 /*
-Plugin Name: HTML/PHP Pages and Posts
+Plugin Name: Custom HTML/PHP Post Templates
 Plugin URI: http://www.github.com/stephenafamo/html-php-pages-and-posts
 Description: Use uploaded html or php files as templates for pages and posts.
-Version: 1.1.0
+Version: 2.0.0
 Author: Stephen Afam-Osemene
 Author URI: https://www.stephenafamo.com/
 License: GPL-2.0+
@@ -14,7 +14,29 @@ if (!class_exists("CustomPagesAndPosts")) {
     
     class CustomPagesAndPosts {
 
-        public function custom_upload_mimes( $existing_mimes ) {
+        public function __construct ($attributes = [])
+        {
+            foreach ($attributes as $key => $attribute) {
+                $this->$key = $attribute;
+            }
+
+            $this->options = get_option($this->plugin_name);
+            $this->options['post_types'] = $this->options['post_types'] ? $this->options['post_types'] : $this->default_post_types;
+
+            add_filter( 'mime_types', [$this, 'custom_upload_mimes'], 1);
+            add_filter( 'single_template', [$this, 'load_custom_template'], 111, 1);
+            add_filter( 'template_include', [$this, 'load_custom_template'], 111, 1);
+            add_filter( 'add_meta_boxes', [$this, 'add_custom_meta_box']);
+            add_action( 'save_post', [$this, 'save_custom_meta_box'], 10, 2);       
+            add_shortcode( 'html_php_page_post', [$this, 'shortcode_parser']); 
+            add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), [$this, 'add_action_links'] );
+            add_action( 'admin_menu', [ $this, 'add_settings_menu'] );
+            add_action('admin_init', [ $this, 'options_update'] );
+            add_action('admin_enqueue_scripts', [ $this, 'media_lib_uploader_enqueue']);
+        }
+
+        public function custom_upload_mimes( $existing_mimes ) 
+        {
             // add webm to the list of mime types
             $existing_mimes['htm|html'] = 'text/html';
             $existing_mimes['php'] = 'php';
@@ -24,15 +46,24 @@ if (!class_exists("CustomPagesAndPosts")) {
             return $existing_mimes;
         }
 
-        public function load_custom_template ($single_template){
-
+        public function load_custom_template ($single_template)
+        {
             global $post;
 
-            $file = wp_upload_dir()['basedir'] . '/' . get_post_meta($post->ID, '_agadyn_custom_template_path', true);
+            if (!in_array($post->post_type, $this->options['post_types']))
+                return $single_template;
+
+            $file = wp_upload_dir()['basedir'] . '/' . $this->options['default_settings'][$post->post_type]['agadyn_custom_template_path'];
+            $options = $this->options['default_settings'][$post->post_type]['agadyn_custom_template_options'];
+
+            $specific_file = wp_upload_dir()['basedir'] . '/' . get_post_meta($post->ID, '_agadyn_custom_template_path', true);
+            
+            if(is_file($specific_file))  {
+                $file = $specific_file;
+                $options = get_post_meta($post->ID, '_agadyn_custom_template_options', true);
+            }
 
             if (is_file($file)){
-
-                $options = get_post_meta($post->ID, '_agadyn_custom_template_options', true);
 
                 switch ($options) {
 
@@ -45,21 +76,26 @@ if (!class_exists("CustomPagesAndPosts")) {
                         break;
 
                     case 'below_content':
-                        $post->post_content .= '[html_php_page_post]';
+                        $post->post_content .= '<br> [html_php_page_post]';
                         break;
 
                     case 'above_content':
-                        $post->post_content = '[html_php_page_post]'.$post->post_content;
+                        $post->post_content = '[html_php_page_post] <br>'.$post->post_content;
                         break;
                 }
             }
             return $single_template;
         }
 
-        public function shortcode_parser( $atts, $content = null ) {
+        public function shortcode_parser( $atts, $content = null ) 
+        {
 
             global $post;
-            $file = wp_upload_dir()['basedir'] . '/' . get_post_meta($post->ID, '_agadyn_custom_template_path', true);
+
+            $file = wp_upload_dir()['basedir'] . '/' . $this->options['default_settings'][$post->post_type]['agadyn_custom_template_path'];
+            $specific_file = wp_upload_dir()['basedir'] . '/' . get_post_meta($post->ID, '_agadyn_custom_template_path', true);
+            if(is_file($specific_file)) $file = $specific_file;
+
             if (is_file($file)){
                 // return file_get_contents($file);
                 ob_start();
@@ -68,9 +104,9 @@ if (!class_exists("CustomPagesAndPosts")) {
             }
         }
 
-        public function add_custom_meta_box(){
-            $default_post_types = ["post", "page"];
-            $post_types = apply_filters ( 'hppp_post_types', $default_post_types);
+        public function add_custom_meta_box()
+        {
+            $post_types = apply_filters ( 'hppp_post_types', $this->options['post_types']);
             add_meta_box( 
                 'agadyn_custom_template', 
                 'Custom HTML or PHP', 
@@ -81,13 +117,26 @@ if (!class_exists("CustomPagesAndPosts")) {
 
         }
 
-        public function custom_meta_box_markup($object) {
+        public function custom_meta_box_markup($object) 
+        {
 
             $template_post_id = get_post_meta($object->ID, "_agadyn_custom_template_id", true);
 
-            if (!$template_post_id) $template_post_id = 0;
-
+            $default_values = [];
+            $default_values['agadyn_custom_template_path'] = get_post_meta($object->ID, "_agadyn_custom_template_path", true);
+            $default_values['agadyn_custom_template_id'] = $template_post_id;
+            $default_values['agadyn_custom_template_options'] = get_post_meta($object->ID, "_agadyn_custom_template_options", true);
+            
             wp_nonce_field(basename(__FILE__), "meta-box-nonce");
+
+            echo $this->template_options_markup ($template_post_id, $default_values);
+
+        }
+
+        public function template_options_markup ($template_post_id = 0, $default_values = [], $unique_prefix = null, $unique_suffix = null)
+        {
+            if (!$template_post_id) $template_post_id = 0;
+            if (!default_values) $default_values = [];
 
             ?>
 
@@ -95,17 +144,19 @@ if (!class_exists("CustomPagesAndPosts")) {
                     <label for="agadyn_custom_template">Link to custom template</label>
 
 
-                    <input name="agadyn_custom_template_name" id="agadyn_custom_template_name" type="text" value="<?php echo get_post_meta($template_post_id, "_wp_attached_file", true);; ?>" readonly> 
+                    <input name="<?php echo $unique_prefix; ?>agadyn_custom_template_path<?php echo $unique_suffix; ?>" id="<?php echo $unique_prefix; ?>agadyn_custom_template_path<?php echo $unique_suffix; ?>" type="text" value="<?php echo $default_values['agadyn_custom_template_path'] ?>" readonly> 
                     <br/>
-                    <input id="upload_template_button" type="button" class="button" value="<?php _e( 'Upload template' ); ?>" />
-                    <input id="delete_template_button" type="button" class="button" value="<?php _e( 'Delete template' ); ?>" />
+                    <input id="upload_template_button" type="button" class="button" value="<?php _e( 'Select/Upload template' ); ?>" 
+                            onclick="select_template(event, <?php echo "'$unique_prefix', '$unique_suffix'"; ?>)"/>
+                    <input id="delete_template_button" type="button" class="button" value="<?php _e( 'Delete template' ); ?>"
+                            onclick="delete_template(event, <?php echo "'$unique_prefix', '$unique_suffix'"; ?>)"/>
                     <br/>
-                    <input name="agadyn_custom_template_id" id="agadyn_custom_template_id" type="hidden" value="<?php echo $template_post_id; ?>">
+                    <input name="<?php echo $unique_prefix; ?>agadyn_custom_template_id<?php echo $unique_suffix; ?>" id="<?php echo $unique_prefix; ?>agadyn_custom_template_id<?php echo $unique_suffix; ?>" type="hidden" value="<?php echo $default_values['agadyn_custom_template_id'] ?>">
 
                     <br>
 
                     <label for="agadyn_custom_template_options">Options</label>
-                    <select name="agadyn_custom_template_options">
+                    <select name="<?php echo $unique_prefix; ?>agadyn_custom_template_options<?php echo $unique_suffix; ?>" id="<?php echo $unique_prefix; ?>agadyn_custom_template_options<?php echo $unique_suffix; ?>">
                         <?php 
                             $option_values = [
                                 'overwrite_all' => 'Overwrite All', 
@@ -115,7 +166,7 @@ if (!class_exists("CustomPagesAndPosts")) {
 
                             foreach($option_values as $key => $value) 
                             {
-                                if($key == get_post_meta($object->ID, "_agadyn_custom_template_options", true))
+                                if($key == $default_values['agadyn_custom_template_options'])
                                 {
                                     ?>
                                         <option value="<?php echo $key?>" selected><?php echo $value; ?></option>
@@ -135,62 +186,11 @@ if (!class_exists("CustomPagesAndPosts")) {
 
                 </div>
 
-                <script type='text/javascript'>
-                    jQuery( document ).ready( function( $ ) {
-                        // Uploading files
-                        var file_frame;
-                        var wp_media_post_id = wp.media.model.settings.post.id; // Store the old id
-                        var set_to_post_id = <?php echo $template_post_id; ?>; // Set this
-                        jQuery('#upload_template_button').on('click', function( event ){
-                            event.preventDefault();
-                            // If the media frame already exists, reopen it.
-                            if ( file_frame ) {
-                                // Set the post ID to what we want
-                                file_frame.uploader.uploader.param( 'post_id', set_to_post_id );
-                                // Open frame
-                                file_frame.open();
-                                return;
-                            } else {
-                                // Set the wp.media post id so the uploader grabs the ID we want when initialised
-                                wp.media.model.settings.post.id = set_to_post_id;
-                            }
-                            // Create the media frame.
-                            file_frame = wp.media.frames.file_frame = wp.media({
-                                title: 'Select a template to upload',
-                                button: {
-                                    text: 'Use this template',
-                                },
-                                multiple: false // Set to true to allow multiple files to be selected
-                            });
-                            // When an image is selected, run a callback.
-                            file_frame.on( 'select', function() {
-                                // We set multiple to false so only get one image from the uploader
-                                attachment = file_frame.state().get('selection').first().toJSON();
-                                // Do something with attachment.id and/or attachment.url here
-                                $( '#agadyn_custom_template_name' ).val( attachment.url);
-                                $( '#agadyn_custom_template_id' ).val( attachment.id );
-                                // Restore the main post ID
-                                wp.media.model.settings.post.id = wp_media_post_id;
-                            });
-                                // Finally, open the modal
-                                file_frame.open();
-                        });
-                        jQuery('#delete_template_button').on('click', function( event ){
-                            var nothing = '';
-                            $( '#agadyn_custom_template_name' ).val( nothing );
-                            $( '#agadyn_custom_template_id' ).val( nothing );
-                        });
-                        // Restore the main ID when the add media button is pressed
-                        jQuery( 'a.add_media' ).on( 'click', function() {
-                            wp.media.model.settings.post.id = wp_media_post_id;
-                        });
-                    });
-                </script>
-
             <?php
         }
 
-        public function save_custom_meta_box($post_id, $post){
+        public function save_custom_meta_box($post_id, $post)
+        {
 
             if (!isset($_POST["meta-box-nonce"]) || !wp_verify_nonce($_POST["meta-box-nonce"], basename(__FILE__)))
                 return $post_id;
@@ -215,20 +215,83 @@ if (!class_exists("CustomPagesAndPosts")) {
             }   
             update_post_meta($post_id, "_agadyn_custom_template_options", $agadyn_custom_template_options);
         }
+
+        public function add_action_links( $links ) 
+        {
+            /*
+            *  Documentation : https://codex.wordpress.org/Plugin_API/Filter_Reference/plugin_action_links_(plugin_file_name)
+            */
+           $settings_link = array(
+            '<a href="' . admin_url( 'options-general.php?page=' . $this->plugin_name ) . '">Settings</a>',
+           );
+           return array_merge(  $settings_link, $links );
+        }
+
+        public function add_settings_menu()
+        {
+            add_options_page(
+                    'Custom HTML/PHP Post Templates Setting',
+                    'Custom templates',
+                    'manage_options',
+                    $this->plugin_name,
+                    [ $this, 'settings_page']
+                );
+        }
+
+        function  settings_page() 
+        {
+            include_once( 'partials/settings-page-display.php' );
+        }
+
+        function options_update() 
+        {
+            register_setting($this->plugin_name, $this->plugin_name, array($this, 'validate_options'));
+        }
+
+        public function validate_options($input) 
+        {       
+            $valid = [];
+
+            foreach ($input['post_types'] as $key => $post_type) {
+                $valid['post_types'][] = filter_var($post_type, FILTER_SANITIZE_STRING);
+            }
+
+            foreach ($input['default_settings'] as $post_type => $settings) {
+                $agadyn_custom_template_id = '';
+                $agadyn_custom_template_path = '';
+                $agadyn_custom_template_options = '';
+                if(isset($settings["agadyn_custom_template_id"]))
+                {
+                    $agadyn_custom_template_id = $settings["agadyn_custom_template_id"];
+                    $agadyn_custom_template_path = get_post_meta( $settings["agadyn_custom_template_id"], '_wp_attached_file', true );
+
+                }
+                if(isset($settings["agadyn_custom_template_options"]))
+                {
+                    $agadyn_custom_template_options = $settings["agadyn_custom_template_options"];
+                }   
+                $valid['default_settings'][$post_type]['agadyn_custom_template_id'] = $agadyn_custom_template_id;
+                $valid['default_settings'][$post_type]['agadyn_custom_template_path'] = $agadyn_custom_template_path;
+                $valid['default_settings'][$post_type]['agadyn_custom_template_options'] = $agadyn_custom_template_options;
+            }
+
+            // var_dump($input, $valid);
+
+            return $valid;
+        }
+
+          /* Add the media uploader script */
+          function media_lib_uploader_enqueue() {
+            wp_enqueue_media();
+            wp_register_script( 'agadyn-media-lib-uploader-js', plugins_url( 'partials/uploader.js' , __FILE__ ), array('jquery') );
+            wp_enqueue_script( 'agadyn-media-lib-uploader-js' );
+          }
+  
     } // end class 
     
 } // end check for class
 
 // Begin!!!
-$class = new CustomPagesAndPosts();
-
-if (isset($class)) {
-
-    add_filter( 'mime_types', array($class, 'custom_upload_mimes' ), 1);
-    add_filter( 'single_template', array($class, 'load_custom_template' ), 111, 1);
-    add_filter( 'template_include', array($class, 'load_custom_template' ), 111, 1);
-    add_filter( 'add_meta_boxes', array($class, 'add_custom_meta_box' ));
-    add_action( 'save_post', array($class, 'save_custom_meta_box' ), 10, 2);       
-    add_shortcode( 'html_php_page_post', array($class, 'shortcode_parser' )); 
-
-}
+$attributes['plugin_name'] = 'html-php-pages-and-posts';
+$attributes['default_post_types'] = ["post", "page"];
+$class = new CustomPagesAndPosts($attributes);

@@ -3,8 +3,8 @@ Contributors: stephenafamo
 Donate link: http://stephenafamo.com
 Tags: html, php, custom pages, custom templates, custom posts
 Requires at least: 3.0.1
-Tested up to: 4.7.1
-Stable tag: 1.1.0
+Tested up to: 4.8
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,20 +24,20 @@ Options:
 * Above Content: Your custom content is simply added to the top of the page content
 * Below Content: You custom content is placed just beneath the page content.
 
+= Adding support for custom post types =
 
-=Adding support for custom post types =
+By default the pulugin works with pages and posts, however, go to the settings to enable it on any other registered post type.
+
 use the `hppp_post_types` filter to add more post types.
 
 Like this:
 
-```
-        public function post_type_modify ($post_types) {
+		public function post_type_modify ($post_types) {
             $post_types[] = 'custom_post_type';
             return $post_types;
         }
 
 	    add_filter( 'hppp_post_types', 'post_type_modify' );
-	    ```
 
 
 == Installation ==
@@ -62,6 +62,10 @@ All wordpress functions, and any installed plugin function will work if called p
 By default, it can only be used by on pages and posts, but you can add any other post type by hooking into the `hppp_post_types` filter.
 
 == Changelog ==
+
+= 2.0.0 =
+* Add settings page to enable support for any registered post type
+* Allow users to set default template for any registered post type
 
 = 1.1.0 =
 * Add filter hook to modify supported post_types
