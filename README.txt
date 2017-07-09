@@ -24,6 +24,7 @@ Options:
 * Above Content: Your custom content is simply added to the top of the page content
 * Below Content: You custom content is placed just beneath the page content.
 
+
 =Adding support for custom post types =
 use the `hppp_post_types` filter to add more post types.
 
