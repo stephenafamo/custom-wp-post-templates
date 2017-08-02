@@ -136,7 +136,7 @@ if (!class_exists("CustomPagesAndPosts")) {
         public function template_options_markup ($template_post_id = 0, $default_values = [], $unique_prefix = null, $unique_suffix = null)
         {
             if (!$template_post_id) $template_post_id = 0;
-            if (!default_values) $default_values = [];
+            if (!$default_values) $default_values = [];
 
             ?>
 

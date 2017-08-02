@@ -17,7 +17,7 @@
 $args = ['show_ui' => true];
 $post_types = get_post_types( $args, 'objects' );
 $this->options = get_option($this->plugin_name);
-$activated_post_types = $this->options['post_types'];
+$activated_post_types = apply_filters ( 'hppp_post_types', $this->options['post_types']);;
 $default_settings = $this->options['default_settings'];
 
 ?>
