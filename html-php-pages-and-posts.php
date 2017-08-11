@@ -292,6 +292,7 @@ if (!class_exists("CustomPagesAndPosts")) {
 } // end check for class
 
 // Begin!!!
+$attributes = [];
 $attributes['plugin_name'] = 'html-php-pages-and-posts';
 $attributes['default_post_types'] = ["post", "page"];
 $class = new CustomPagesAndPosts($attributes);
