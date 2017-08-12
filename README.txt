@@ -1,4 +1,4 @@
-=== Plugin Name ===
+=== Custom HTML/PHP Post Templates ===
 Contributors: stephenafamo
 Donate link: http://stephenafamo.com
 Tags: html, php, custom pages, custom templates, custom posts
@@ -72,3 +72,8 @@ By default, it can only be used by on pages and posts, but you can add any other
 
 = 1.0.0 =
 * First release
+* 
+
+== Screenshots ==
+ 
+There are no screenshots yet.
